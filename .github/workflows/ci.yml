@@ -1,0 +1,60 @@
+name: CI Pipeline for YouTube Comment Sentiment Analysis
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the code from GitHub
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      # Set up Python environment
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+
+      # Install dependencies
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Install DVC, DVC-S3, and MLflow
+      - name: Install DVC, DVC-S3, and MLflow
+        run: |
+          pip install dvc[all] dvc-s3 boto3 mlflow
+
+      # Configure AWS credentials for DVC
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # Pull DVC data from S3
+      - name: Pull DVC data
+        run: dvc pull
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+
+      - name: Run DVC Pipeline
+        run: dvc repro
+      # Commit the updated DVC files
+      - name: Commit DVC files
+        run: |
+          git add dvc.yaml dvc.lock
+          git commit -m "Update DVC pipeline"
+          git push
